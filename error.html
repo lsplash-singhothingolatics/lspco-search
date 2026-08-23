@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Something broke — LSPSO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Manrope:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="home">
+  <div class="home-inner">
+    <h1 class="wordmark home-mark">LSPSO<span class="dot">.</span></h1>
+    <span class="label">Something broke on our side</span>
+    <div class="notice" style="margin-top:2rem">
+      That search couldn't be completed. Go back and try again.
+      {% if detail %}<pre style="text-align:left;overflow:auto;font-size:0.72rem;margin-top:1.25rem;color:var(--graphite)">{{ detail }}</pre>{% endif %}
+    </div>
+    <p class="hint"><a href="/">Back to search</a></p>
+  </div>
+</main>
+</body>
+</html>

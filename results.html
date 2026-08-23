@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ q or site }} — LSPSO</title>
+<meta name="theme-color" content="#f6f5f2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Manrope:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="/">LSPSO<span class="dot">.</span></a>
+  <form action="/search" method="get" autocomplete="off">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    <input type="hidden" name="site" value="{{ site }}">
+    <input type="hidden" name="time" value="{{ f.time|default('') }}">
+    <input type="hidden" name="type" value="{{ f.type|default('') }}">
+    <input type="hidden" name="region" value="{{ f.region|default('') }}">
+    <input type="hidden" name="safe" value="{{ f.safe|default('on') }}">
+    <div class="lens">
+      <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path>
+      </svg>
+      <input type="text" name="q" value="{{ q }}" aria-label="Search">
+      <button type="submit" class="go">Search</button>
+    </div>
+  </form>
+</header>
+
+<main class="wrap">
+
+  <form class="filters" action="/search" method="get">
+    <input type="hidden" name="q" value="{{ q }}">
+    <input type="hidden" name="site" value="{{ site }}">
+    <input type="hidden" name="mode" value="{{ mode }}">
+
+    <select name="time" onchange="this.form.submit()" aria-label="Time">
+      <option value="">Any time</option>
+      <option value="day"   {{ 'selected' if f.time|default('') == 'day' }}>Past 24 hours</option>
+      <option value="week"  {{ 'selected' if f.time|default('') == 'week' }}>Past week</option>
+      <option value="month" {{ 'selected' if f.time|default('') == 'month' }}>Past month</option>
+      <option value="year"  {{ 'selected' if f.time|default('') == 'year' }}>Past year</option>
+    </select>
+
+    <select name="type" onchange="this.form.submit()" aria-label="File type">
+      <option value="">Any file</option>
+      {% for t in file_types|default([]) %}
+      <option value="{{ t }}" {{ 'selected' if f.type|default('') == t }}>{{ t|upper }} only</option>
+      {% endfor %}
+    </select>
+
+    <select name="region" onchange="this.form.submit()" aria-label="Region">
+      {% for code, name in regions|default({})|dictsort %}
+      <option value="{{ code }}" {{ 'selected' if f.region|default('') == code }}>{{ name }}</option>
+      {% endfor %}
+    </select>
+
+    <label class="safe">
+      <input type="checkbox" name="safe" value="on" onchange="this.form.submit()" {{ 'checked' if f.safe|default('on') == 'on' }}>
+      Safe search
+    </label>
+
+    {% if f.time|default('') or f.type|default('') or f.region|default('') or f.safe|default('on') == 'off' %}
+      <a class="clear" href="{{ url_for('search', q=q, site=site, mode=mode) }}">Clear filters</a>
+    {% endif %}
+  </form>
+
+  <span class="label meta">
+    {% if site %}Inside {{ site }} &nbsp;·&nbsp;{% endif %}
+    {{ count }} result{{ '' if count == 1 else 's' }} &nbsp;·&nbsp; Page {{ page }} &nbsp;·&nbsp; {{ engine }}
+  </span>
+
+  {% if direct %}
+    <a class="direct" href="{{ direct }}" rel="noopener noreferrer" target="_blank">
+      <span>
+        <span class="label">Open website</span>
+        <span class="url">{{ direct }}</span>
+      </span>
+      <span class="arrow" aria-hidden="true">↗</span>
+    </a>
+  {% endif %}
+
+  {% if answer %}
+    <section class="answer">
+      <span class="label">Short answer</span>
+      <p>{{ answer }}</p>
+    </section>
+  {% endif %}
+
+  {% if error %}
+    <div class="notice">{{ error }}</div>
+  {% endif %}
+
+  {% for r in results %}
+    <article class="result">
+      <div class="idx">{{ '%02d' % (loop.index + (page - 1) * 20) }}</div>
+      <div>
+        <div class="chip">{{ r.domain }}</div>
+        <h3><a href="{{ r.url }}" rel="noopener noreferrer" target="_blank">{{ r.title }}</a></h3>
+        <p>{{ r.snippet }}</p>
+      </div>
+    </article>
+  {% endfor %}
+
+  {% if results %}
+    <nav class="pager">
+      {% if page > 1 %}
+        <a href="{{ url_for('search', q=q, site=site, mode=mode, page=page-1, time=f.time|default(''), type=f.type|default(''), region=f.region|default(''), safe=f.safe|default('on')) }}">← Previous</a>
+      {% endif %}
+      <a href="{{ url_for('search', q=q, site=site, mode=mode, page=page+1, time=f.time|default(''), type=f.type|default(''), region=f.region|default(''), safe=f.safe|default('on')) }}">Next →</a>
+    </nav>
+  {% endif %}
+
+  <div class="foot"><span class="label">LSPSO</span></div>
+
+</main>
+</body>
+</html>

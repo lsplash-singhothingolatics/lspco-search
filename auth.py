@@ -17,6 +17,9 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
 GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "").strip()
 GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "").strip()
+GITLAB_CLIENT_ID = os.environ.get("GITLAB_CLIENT_ID", "").strip()
+GITLAB_CLIENT_SECRET = os.environ.get("GITLAB_CLIENT_SECRET", "").strip()
+GITLAB_HOST = os.environ.get("GITLAB_HOST", "https://gitlab.com").rstrip("/")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 MAIL_FROM = os.environ.get("MAIL_FROM", "LSPSO <onboarding@resend.dev>").strip()
 
@@ -27,6 +30,7 @@ def providers():
     return {
         "google": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
         "github": bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET),
+        "gitlab": bool(GITLAB_CLIENT_ID and GITLAB_CLIENT_SECRET),
         "email": bool(RESEND_API_KEY),
     }
 
@@ -196,6 +200,69 @@ def github_callback():
     sign_in(db.upsert_user(
         email, profile.get("name") or profile.get("login"),
         profile.get("avatar_url"), "github",
+    ))
+    return redirect(safe_next())
+
+
+# ------------------------------------------------------------------ gitlab
+
+@auth.route("/auth/gitlab")
+def gitlab_start():
+    if not providers()["gitlab"]:
+        flash("GitLab sign-in is not configured yet.")
+        return redirect(url_for("auth.login"))
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
+    params = {
+        "client_id": GITLAB_CLIENT_ID,
+        "redirect_uri": url_for("auth.gitlab_callback", _external=True, _scheme="https"),
+        "response_type": "code",
+        "scope": "read_user",
+        "state": state,
+    }
+    return redirect(f"{GITLAB_HOST}/oauth/authorize?" + urlencode(params))
+
+
+@auth.route("/auth/gitlab/callback")
+def gitlab_callback():
+    if request.args.get("state") != session.pop("oauth_state", None):
+        flash("Sign-in expired. Please try again.")
+        return redirect(url_for("auth.login"))
+    code = request.args.get("code")
+    if not code:
+        flash("GitLab sign-in was cancelled.")
+        return redirect(url_for("auth.login"))
+
+    try:
+        token = requests.post(
+            f"{GITLAB_HOST}/oauth/token",
+            data={
+                "client_id": GITLAB_CLIENT_ID,
+                "client_secret": GITLAB_CLIENT_SECRET,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": url_for("auth.gitlab_callback", _external=True, _scheme="https"),
+            },
+            timeout=TIMEOUT,
+        ).json()
+        profile = requests.get(
+            f"{GITLAB_HOST}/api/v4/user",
+            headers={"Authorization": "Bearer " + token["access_token"]},
+            timeout=TIMEOUT,
+        ).json()
+    except Exception:
+        flash("Could not reach GitLab. Please try again.")
+        return redirect(url_for("auth.login"))
+
+    if not profile.get("email"):
+        flash("GitLab did not share an email address.")
+        return redirect(url_for("auth.login"))
+
+    sign_in(db.upsert_user(
+        profile["email"],
+        profile.get("name") or profile.get("username"),
+        profile.get("avatar_url"),
+        "gitlab",
     ))
     return redirect(safe_next())
 

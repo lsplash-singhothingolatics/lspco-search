@@ -79,6 +79,8 @@ Sign in with Google, GitHub, or a 6-digit code emailed by Resend. Add these in R
 | `SECRET_KEY` | Any long random string. Signs the session cookie — required. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | console.cloud.google.com -> Credentials -> OAuth client ID (Web application) |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | github.com/settings/developers -> New OAuth App |
+| `GITLAB_CLIENT_ID` / `GITLAB_CLIENT_SECRET` | gitlab.com -> Preferences -> Applications |
+| `GITLAB_HOST` | Optional. Only for self-hosted GitLab. Defaults to `https://gitlab.com`. |
 | `RESEND_API_KEY` | resend.com -> API Keys |
 | `MAIL_FROM` | Optional. Defaults to `LSPSO <onboarding@resend.dev>`. |
 
@@ -88,6 +90,7 @@ Whichever keys you add, those buttons appear on the sign-in page. The others sta
 
 - Google -> Authorised redirect URI: `https://YOUR-APP.onrender.com/auth/google/callback`
 - GitHub -> Authorization callback URL: `https://YOUR-APP.onrender.com/auth/github/callback`
+- GitLab -> Redirect URI: `https://YOUR-APP.onrender.com/auth/gitlab/callback` (scope: `read_user`)
 
 ### Where accounts are stored
 

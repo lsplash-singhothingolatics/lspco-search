@@ -459,6 +459,7 @@ def status():
         "secret_key_set": os.environ.get("SECRET_KEY") is not None,
         "google_ready": bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")),
         "github_ready": bool(os.environ.get("GITHUB_CLIENT_ID") and os.environ.get("GITHUB_CLIENT_SECRET")),
+        "gitlab_ready": bool(os.environ.get("GITLAB_CLIENT_ID") and os.environ.get("GITLAB_CLIENT_SECRET")),
         "resend_ready": bool(os.environ.get("RESEND_API_KEY")),
         "database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite (wiped on redeploy)",
     }

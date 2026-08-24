@@ -18,8 +18,15 @@ import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template, request, session
 
-import db
-from auth import auth as auth_blueprint, current_user
+AUTH_ERROR = None
+try:
+    import db
+    from auth import auth as auth_blueprint, current_user
+    AUTH_ENABLED = True
+except Exception as _exc:                      # missing file, missing package, bad DB url
+    AUTH_ENABLED = False
+    AUTH_ERROR = f"{type(_exc).__name__}: {_exc}"
+    current_user = lambda: None
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
@@ -28,21 +35,25 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
-app.register_blueprint(auth_blueprint)
-
-try:
-    db.init_db()
-except Exception as exc:                       # never let a DB hiccup kill boot
-    app.logger.error("Database init failed: %s", exc)
+if AUTH_ENABLED:
+    app.register_blueprint(auth_blueprint)
+    try:
+        db.init_db()
+    except Exception as exc:                   # never let a DB hiccup kill boot
+        AUTH_ENABLED = False
+        AUTH_ERROR = f"Database init failed: {exc}"
+        app.logger.error(AUTH_ERROR)
+else:
+    app.logger.error("Accounts disabled -> %s", AUTH_ERROR)
 
 
 @app.context_processor
 def inject_user():
     """Makes `user` available inside every template."""
     try:
-        return {"user": current_user()}
+        return {"user": current_user(), "auth_on": AUTH_ENABLED}
     except Exception:
-        return {"user": None}
+        return {"user": None, "auth_on": False}
 
 SERPER_KEY = os.environ.get("SERPER_API_KEY", "").strip()
 GOOGLE_KEY = os.environ.get("GOOGLE_API_KEY", "").strip()
@@ -407,12 +418,50 @@ def search():
 @app.errorhandler(500)
 @app.errorhandler(Exception)
 def server_error(e):
-    """Log the real traceback and show a readable page instead of a blank 500."""
+    """Log the real traceback. Never raise from inside here."""
     import traceback
+    from werkzeug.exceptions import HTTPException
+
+    if isinstance(e, HTTPException) and e.code != 500:
+        return e                               # let 404 etc. behave normally
+
     tb = traceback.format_exc()
     app.logger.error("LSPSO error:\n%s", tb)
-    detail = tb if app.debug or os.environ.get("SHOW_ERRORS") == "1" else ""
-    return render_template("error.html", detail=detail), 500
+    show = app.debug or os.environ.get("SHOW_ERRORS") == "1"
+    detail = tb if show else ""
+
+    try:
+        return render_template("error.html", detail=detail), 500
+    except Exception:
+        # templates missing or broken -> plain HTML so the cause is still visible
+        body = "<pre>" + detail.replace("<", "&lt;") + "</pre>" if show else \
+               "<p>Something broke. Try again.</p>"
+        return (
+            "<html><body style=\"font-family:sans-serif;padding:40px;max-width:800px\">"
+            "<h2>LSPSO</h2>" + body +
+            "<p><a href=\"/\">Back to search</a></p></body></html>",
+            500,
+        )
+
+
+@app.route("/status")
+def status():
+    """Open /status to see what is configured. No secrets are shown."""
+    import sys
+    tpl = os.path.join(app.root_path, "templates")
+    return {
+        "python": sys.version.split()[0],
+        "templates_found": sorted(os.listdir(tpl)) if os.path.isdir(tpl) else "templates folder MISSING",
+        "static_found": os.path.isfile(os.path.join(app.root_path, "static", "style.css")),
+        "search_engine": engine_name(),
+        "accounts_enabled": AUTH_ENABLED,
+        "accounts_problem": AUTH_ERROR,
+        "secret_key_set": os.environ.get("SECRET_KEY") is not None,
+        "google_ready": bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")),
+        "github_ready": bool(os.environ.get("GITHUB_CLIENT_ID") and os.environ.get("GITHUB_CLIENT_SECRET")),
+        "resend_ready": bool(os.environ.get("RESEND_API_KEY")),
+        "database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite (wiped on redeploy)",
+    }
 
 
 @app.route("/healthz")

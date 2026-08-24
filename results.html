@@ -29,16 +29,16 @@
       <button type="submit" class="go">Search</button>
     </div>
   </form>
-  <div class="session">
-    {% if user %}
+  {% if auth_on %}<div class="session">
+    {% if user is defined and user %}
       <a class="avatar" href="{{ url_for('auth.account') }}" title="{{ user.email }}">
         {% if user.avatar %}<img class="avatar" src="{{ user.avatar }}" alt="">{% else %}{{ (user.name or user.email)[0]|upper }}{% endif %}
       </a>
     {% else %}
-      <a class="signin" href="{{ url_for('auth.login') }}">Sign in</a>
+      <a class="signin" href="/login">Sign in</a>
     {% endif %}
-  </div>
-  </header>
+  </div>{% endif %}
+</header>
 
 <main class="wrap">
 

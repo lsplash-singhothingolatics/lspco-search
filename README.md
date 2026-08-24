@@ -91,11 +91,30 @@ Whichever keys you add, those buttons appear on the sign-in page. The others sta
 
 ### Where accounts are stored
 
-By default a SQLite file, which **Render's free plan erases on every deploy**. For accounts that survive, create a Render Postgres database and add its Internal Database URL as `DATABASE_URL`. The app detects it and uses it automatically.
+By default a SQLite file, which **Render's free plan erases on every deploy**. For accounts that survive, create a Render Postgres database, add its Internal Database URL as `DATABASE_URL`, and add this line to `requirements.txt`:
+
+```
+psycopg[binary]==3.2.1
+```
+
+The app detects the driver and switches over automatically. Leave that line out while you are on SQLite — the older `psycopg2-binary` has no prebuilt wheel for Python 3.13+ and will fail the build.
 
 ### Security built in
 
 Codes are 6 digits, hashed before storage, expire in 10 minutes, allow 5 attempts, and can only be requested once a minute per address. OAuth uses a `state` token to block cross-site request forgery.
+
+## When something breaks
+
+Open **`https://YOUR-APP.onrender.com/status`**. It reports, without revealing any secrets:
+
+- which templates were actually found (catches missing uploads)
+- whether accounts loaded, and the exact error if not
+- which sign-in providers and search engine are configured
+- the Python version in use
+
+Search keeps working even if accounts fail to load — the sign-in button simply disappears.
+
+To see a full traceback in the browser, set `SHOW_ERRORS=1` in Render. Remove it once fixed.
 
 ## Notes
 

@@ -17,7 +17,14 @@ from sqlalchemy import (
 
 DB_URL = os.environ.get("DATABASE_URL", "").strip()
 if DB_URL.startswith("postgres://"):           # Render gives the old prefix
-    DB_URL = DB_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+    DB_URL = DB_URL.replace("postgres://", "postgresql://", 1)
+if DB_URL.startswith("postgresql://"):
+    # pick whichever postgres driver is actually installed
+    try:
+        import psycopg  # noqa: F401
+        DB_URL = DB_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+    except ImportError:
+        DB_URL = DB_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 if not DB_URL:
     DB_URL = "sqlite:///lspso.db"
 

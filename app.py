@@ -35,6 +35,31 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
+try:
+    from legal import legal as legal_blueprint
+    app_has_legal = True
+except Exception as _lexc:
+    app_has_legal = False
+
+try:
+    from viewer import viewer as viewer_blueprint, proxy_link
+    app.register_blueprint(viewer_blueprint)
+    VIEWER_ENABLED = True
+except Exception as _vexc:
+    VIEWER_ENABLED = False
+    proxy_link = lambda u: u
+    app.logger.error("In-site viewer unavailable: %s", _vexc)
+
+
+@app.template_filter("via_lspso")
+def via_lspso(url):
+    """Route a result link through the in-site viewer."""
+    return proxy_link(url) if VIEWER_ENABLED else url
+
+
+if app_has_legal:
+    app.register_blueprint(legal_blueprint)
+
 if AUTH_ENABLED:
     app.register_blueprint(auth_blueprint)
     try:
@@ -569,12 +594,15 @@ def status():
         "static_found": os.path.isfile(os.path.join(app.root_path, "static", "style.css")),
         "search_engine": engine_name(),
         "accounts_enabled": AUTH_ENABLED,
+        "in_site_viewer": VIEWER_ENABLED,
         "accounts_problem": AUTH_ERROR,
         "secret_key_set": os.environ.get("SECRET_KEY") is not None,
         "google_ready": bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")),
         "github_ready": bool(os.environ.get("GITHUB_CLIENT_ID") and os.environ.get("GITHUB_CLIENT_SECRET")),
         "gitlab_ready": bool(os.environ.get("GITLAB_CLIENT_ID") and os.environ.get("GITLAB_CLIENT_SECRET")),
         "microsoft_ready": bool(os.environ.get("MICROSOFT_CLIENT_ID") and os.environ.get("MICROSOFT_CLIENT_SECRET")),
+        "discord_ready": bool(os.environ.get("DISCORD_CLIENT_ID") and os.environ.get("DISCORD_CLIENT_SECRET")),
+        "chatgpt_ready": bool(os.environ.get("CHATGPT_CLIENT_ID") and os.environ.get("CHATGPT_CLIENT_SECRET")),
         "resend_ready": bool(os.environ.get("RESEND_API_KEY")),
         "database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite (wiped on redeploy)",
     }

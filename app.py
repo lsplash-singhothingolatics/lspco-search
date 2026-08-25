@@ -72,6 +72,11 @@ RESULTS_PER_PAGE = 20
 # helpers
 # ----------------------------------------------------------------------------
 
+NO_ENGINE_MESSAGE = (
+    "The free search source is blocking this server, which is common on shared "
+    "cloud hosting. Adding a search API key fixes it permanently \u2014 see /status."
+)
+
 TIME_MAP = {
     "day": {"google": "d1", "ddg": "d", "serper": "qdr:d", "brave": "pd"},
     "week": {"google": "w1", "ddg": "w", "serper": "qdr:w", "brave": "pw"},
@@ -261,24 +266,82 @@ def search_brave(query: str, page: int, f):
     return results, None
 
 
-def search_duckduckgo(query: str, page: int, f):
-    offset = (page - 1) * 30
-    r = requests.post(
-        "https://html.duckduckgo.com/html/",
-        data={
-            "q": query,
-            "s": str(offset),
-            "kl": (f["region"] + "-" + f["region"]) if f["region"] else "wt-wt",
-            "kp": "1" if f["safe"] == "on" else "-2",
-            **({"df": TIME_MAP[f["time"]]["ddg"]} if f["time"] else {}),
+def search_wikipedia(query: str, page: int, f):
+    """Last-resort source. Wikipedia's API is open to cloud servers, so the site
+    still returns something useful when no search key is configured."""
+    r = requests.get(
+        "https://en.wikipedia.org/w/api.php",
+        params={
+            "action": "query", "list": "search", "srsearch": query,
+            "srlimit": RESULTS_PER_PAGE, "sroffset": (page - 1) * RESULTS_PER_PAGE,
+            "format": "json", "srprop": "snippet",
         },
-        headers={"User-Agent": UA, "Referer": "https://duckduckgo.com/"},
+        headers={"User-Agent": "LSPSO/1.0 (search app)"},
         timeout=TIMEOUT,
     )
     r.raise_for_status()
-    soup = BeautifulSoup(r.text, "html.parser")
-
+    hits = r.json().get("query", {}).get("search", [])
     results = []
+    for h in hits:
+        slug = h["title"].replace(" ", "_")
+        results.append({
+            "title": h["title"],
+            "url": f"https://en.wikipedia.org/wiki/{quote_plus(slug)}",
+            "snippet": re.sub(r"<[^>]+>", "", h.get("snippet", "")) + "…",
+            "domain": "en.wikipedia.org",
+        })
+    return results, None
+
+
+def search_duckduckgo(query: str, page: int, f):
+    """DuckDuckGo has several front-ends. Cloud IPs get blocked on some but not
+    others, so try each in turn and use the first that returns results."""
+    offset = (page - 1) * 30
+    data = {
+        "q": query,
+        "s": str(offset),
+        "kl": (f["region"] + "-" + f["region"]) if f["region"] else "wt-wt",
+        "kp": "1" if f["safe"] == "on" else "-2",
+        **({"df": TIME_MAP[f["time"]]["ddg"]} if f["time"] else {}),
+    }
+    headers = {
+        "User-Agent": UA,
+        "Referer": "https://duckduckgo.com/",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
+    endpoints = [
+        ("POST", "https://html.duckduckgo.com/html/"),
+        ("POST", "https://lite.duckduckgo.com/lite/"),
+        ("GET", "https://html.duckduckgo.com/html/"),
+    ]
+
+    last_error = None
+    for method, url in endpoints:
+        try:
+            if method == "POST":
+                r = requests.post(url, data=data, headers=headers, timeout=TIMEOUT)
+            else:
+                r = requests.get(url, params=data, headers=headers, timeout=TIMEOUT)
+            r.raise_for_status()
+            results = parse_ddg_html(r.text)
+            if results:
+                return results[:RESULTS_PER_PAGE], ddg_instant_answer(query)
+            last_error = f"{url} returned no results"
+        except Exception as exc:
+            last_error = f"{url} -> {type(exc).__name__}: {exc}"
+            continue
+
+    app.logger.error("All DuckDuckGo endpoints failed. Last: %s", last_error)
+    raise RuntimeError(last_error or "DuckDuckGo unavailable")
+
+
+def parse_ddg_html(html_text):
+    """Works for both the html/ and lite/ front-ends."""
+    soup = BeautifulSoup(html_text, "html.parser")
+    results = []
+
     for block in soup.select("div.result, div.web-result"):
         link = block.select_one("a.result__a")
         if not link:
@@ -287,18 +350,33 @@ def search_duckduckgo(query: str, page: int, f):
         if not url.startswith("http"):
             continue
         snip = block.select_one(".result__snippet")
-        results.append(
-            {
-                "title": link.get_text(" ", strip=True),
-                "url": url,
-                "snippet": snip.get_text(" ", strip=True) if snip else "",
-                "domain": domain_of(url),
-            }
-        )
-        if len(results) >= RESULTS_PER_PAGE:
-            break
+        results.append({
+            "title": link.get_text(" ", strip=True),
+            "url": url,
+            "snippet": snip.get_text(" ", strip=True) if snip else "",
+            "domain": domain_of(url),
+        })
 
-    return results, ddg_instant_answer(query)
+    if results:
+        return results
+
+    # lite/ uses a plain table layout
+    for link in soup.select("a.result-link"):
+        url = unwrap_ddg(link.get("href", ""))
+        if not url.startswith("http"):
+            continue
+        row = link.find_parent("tr")
+        snippet = ""
+        if row and row.find_next_sibling("tr"):
+            snippet = row.find_next_sibling("tr").get_text(" ", strip=True)
+        results.append({
+            "title": link.get_text(" ", strip=True),
+            "url": url,
+            "snippet": snippet,
+            "domain": domain_of(url),
+        })
+
+    return results
 
 
 def ddg_instant_answer(query: str):
@@ -332,7 +410,11 @@ def run_search(query: str, page: int, f):
         elif BRAVE_KEY:
             results, answer = search_brave(query, page, f)
         else:
-            results, answer = search_duckduckgo(query, page, f)
+            try:
+                results, answer = search_duckduckgo(query, page, f)
+            except Exception:
+                # cloud IPs are often blocked -> fall back to an open source
+                results, answer = search_wikipedia(query, page, f)
         if answer is None:
             answer = ddg_instant_answer(query)
         if not results:
@@ -341,8 +423,12 @@ def run_search(query: str, page: int, f):
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
         return [], None, f"The search provider replied with error {code}. Wait a moment and search again."
-    except requests.RequestException:
-        return [], None, "Could not reach the search provider. Check the connection and try again."
+    except requests.RequestException as e:
+        app.logger.error("Search request failed: %s", e)
+        return [], None, NO_ENGINE_MESSAGE
+    except Exception as e:
+        app.logger.error("Search failed: %s", e)
+        return [], None, NO_ENGINE_MESSAGE
 
 
 # ----------------------------------------------------------------------------
@@ -444,6 +530,34 @@ def server_error(e):
         )
 
 
+@app.route("/debug/search")
+def debug_search():
+    """Shows exactly which search sources work from this server."""
+    q = request.args.get("q", "python")
+    report = {}
+    tests = [
+        ("duckduckgo_html", "POST", "https://html.duckduckgo.com/html/"),
+        ("duckduckgo_lite", "POST", "https://lite.duckduckgo.com/lite/"),
+        ("wikipedia", "GET", "https://en.wikipedia.org/w/api.php"),
+    ]
+    for name, method, url in tests:
+        try:
+            if name == "wikipedia":
+                r = requests.get(url, params={"action": "query", "list": "search",
+                                              "srsearch": q, "format": "json"},
+                                 headers={"User-Agent": "LSPSO/1.0"}, timeout=10)
+            elif method == "POST":
+                r = requests.post(url, data={"q": q}, headers={"User-Agent": UA}, timeout=10)
+            report[name] = f"HTTP {r.status_code}" + (
+                " (blocked - normal on cloud hosting)" if r.status_code == 403 else ""
+            )
+        except Exception as exc:
+            report[name] = f"{type(exc).__name__}: {exc}"
+    report["configured_engine"] = engine_name()
+    report["fix"] = "Set GOOGLE_API_KEY + GOOGLE_CX for reliable results (100 free/day)."
+    return report
+
+
 @app.route("/status")
 def status():
     """Open /status to see what is configured. No secrets are shown."""
@@ -460,6 +574,7 @@ def status():
         "google_ready": bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")),
         "github_ready": bool(os.environ.get("GITHUB_CLIENT_ID") and os.environ.get("GITHUB_CLIENT_SECRET")),
         "gitlab_ready": bool(os.environ.get("GITLAB_CLIENT_ID") and os.environ.get("GITLAB_CLIENT_SECRET")),
+        "microsoft_ready": bool(os.environ.get("MICROSOFT_CLIENT_ID") and os.environ.get("MICROSOFT_CLIENT_SECRET")),
         "resend_ready": bool(os.environ.get("RESEND_API_KEY")),
         "database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite (wiped on redeploy)",
     }

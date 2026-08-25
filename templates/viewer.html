@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} — LSPSO</title>
+<meta name="theme-color" content="#f6f5f2">
+<meta name="referrer" content="no-referrer">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Manrope:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="reading">
+
+<header class="viewbar">
+  <a class="wordmark" href="/">LSPSO<span class="dot">.</span></a>
+  <div class="viewbar-url">
+    <span class="label">Viewing</span>
+    <span class="host">{{ domain }}</span>
+  </div>
+  <div class="viewbar-actions">
+    <a class="ghost-link" href="javascript:history.back()">← Back</a>
+    <a class="ghost-link" href="{{ url }}" target="_blank" rel="noopener noreferrer">Original ↗</a>
+  </div>
+</header>
+
+<main class="reader">
+  {% if error %}
+    <div class="notice">
+      {{ error }}
+      <p style="margin-top:1rem"><a class="ghost-link" href="{{ url }}" target="_blank" rel="noopener noreferrer">Open {{ domain }} directly ↗</a></p>
+    </div>
+  {% else %}
+    <article class="page-content">{{ content|safe }}</article>
+  {% endif %}
+</main>
+
+</body>
+</html>

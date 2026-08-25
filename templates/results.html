@@ -84,7 +84,7 @@
   </span>
 
   {% if direct %}
-    <a class="direct" href="{{ direct }}" rel="noopener noreferrer" target="_blank">
+    <a class="direct" href="{{ direct|via_lspso }}">
       <span>
         <span class="label">Open website</span>
         <span class="url">{{ direct }}</span>
@@ -109,7 +109,8 @@
       <div class="idx">{{ '%02d' % (loop.index + (page - 1) * 20) }}</div>
       <div>
         <div class="chip">{{ r.domain }}</div>
-        <h3><a href="{{ r.url }}" rel="noopener noreferrer" target="_blank">{{ r.title }}</a></h3>
+        <h3><a href="{{ r.url|via_lspso }}">{{ r.title }}</a></h3>
+        <a class="ext" href="{{ r.url }}" target="_blank" rel="noopener noreferrer" title="Open on the original site">original ↗</a>
         <p>{{ r.snippet }}</p>
       </div>
     </article>

@@ -93,6 +93,8 @@ Sign in with Google, GitHub, or a 6-digit code emailed by Resend. Add these in R
 | `GITLAB_HOST` | Optional. Only for self-hosted GitLab. Defaults to `https://gitlab.com`. |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | portal.azure.com -> App registrations -> New registration |
 | `MICROSOFT_TENANT` | Optional. Defaults to `common` (any Microsoft account). Use your tenant ID to restrict to one organisation. |
+| `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | discord.com/developers/applications -> New Application -> OAuth2 |
+| `CHATGPT_CLIENT_ID` / `CHATGPT_CLIENT_SECRET` | Partner-only. OpenAI issues these on request; there is no public console. Button stays hidden until both are set. |
 | `RESEND_API_KEY` | resend.com -> API Keys |
 | `MAIL_FROM` | Optional. Defaults to `LSPSO <onboarding@resend.dev>`. |
 
@@ -104,6 +106,8 @@ Whichever keys you add, those buttons appear on the sign-in page. The others sta
 - GitHub -> Authorization callback URL: `https://YOUR-APP.onrender.com/auth/github/callback`
 - GitLab -> Redirect URI: `https://YOUR-APP.onrender.com/auth/gitlab/callback` (scope: `read_user`)
 - Microsoft -> Redirect URI (platform: Web): `https://YOUR-APP.onrender.com/auth/microsoft/callback`
+- Discord -> OAuth2 Redirect: `https://YOUR-APP.onrender.com/auth/discord/callback` (scopes: `identify`, `email`)
+- ChatGPT -> Redirect URI: `https://YOUR-APP.onrender.com/auth/chatgpt/callback`
 
 ### Where accounts are stored
 
@@ -131,6 +135,20 @@ Open **`https://YOUR-APP.onrender.com/status`**. It reports, without revealing a
 Search keeps working even if accounts fail to load — the sign-in button simply disappears.
 
 To see a full traceback in the browser, set `SHOW_ERRORS=1` in Render. Remove it once fixed.
+
+## Terms and Privacy
+
+`/terms` and `/privacy` are served from `legal.py` + `templates/legal.html`. The terms include an acceptable-use section banning violent content, extremism, weapons instructions, child sexual abuse material, harassment and hate, self-harm content, illegal activity, and non-consensual intimate imagery.
+
+Optional environment variables:
+
+| Key | Effect |
+|---|---|
+| `CONTACT_EMAIL` | Shown as the contact address on both pages. Recommended. |
+| `SITE_NAME` | Defaults to `LSPSO`. |
+| `LEGAL_UPDATED` | Fixes the "last updated" date. Defaults to today. |
+
+These are a plain-language starting point, not legal advice. Have a lawyer review them before relying on them.
 
 ## Notes
 

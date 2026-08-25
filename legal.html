@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if page == 'terms' %}Terms of Service{% else %}Privacy Policy{% endif %} — {{ site }}</title>
+<meta name="theme-color" content="#f6f5f2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Manrope:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="viewbar">
+  <a class="wordmark" href="/">{{ site }}<span class="dot">.</span></a>
+  <div class="viewbar-url">
+    <span class="label">{% if page == 'terms' %}Terms of Service{% else %}Privacy Policy{% endif %}</span>
+  </div>
+  <div class="viewbar-actions">
+    <a class="ghost-link" href="{{ url_for('legal.terms') }}">Terms</a>
+    <a class="ghost-link" href="{{ url_for('legal.privacy') }}">Privacy</a>
+  </div>
+</header>
+
+<main class="legal">
+
+{% if page == 'terms' %}
+
+  <h1>Terms of Service</h1>
+  <p class="updated">Last updated {{ updated }}</p>
+
+  <p>These terms cover your use of {{ site }}, a search website. By using {{ site }} you agree to them. If you don't agree, please don't use the service.</p>
+
+  <h2>1. What {{ site }} is</h2>
+  <p>{{ site }} is a search tool. It sends your query to third-party search providers and shows you the results. It can also display pages from other websites inside {{ site }} for easier reading.</p>
+  <p>{{ site }} does not create, own, host, or endorse the content it returns. Results come from the open web. We can't vouch for the accuracy, legality, or safety of anything a third-party site publishes.</p>
+
+  <h2>2. Who may use it</h2>
+  <p>You must be at least 13 years old. If you're under 18, you need permission from a parent or guardian. If you create an account, the details you provide must be accurate and you're responsible for anything done through it.</p>
+
+  <h2>3. Acceptable use</h2>
+  <p>{{ site }} is meant to be a safe, useful tool. You agree <strong>not</strong> to use it to search for, distribute, produce, or promote:</p>
+  <ul>
+    <li><strong>Violent content</strong> — threats against any person or group, incitement to violence, glorification of violence, or instructions for carrying out violent acts.</li>
+    <li><strong>Terrorism or violent extremism</strong> — material that supports, recruits for, or celebrates terrorist or extremist organisations.</li>
+    <li><strong>Weapons or dangerous goods</strong> — instructions for making weapons, explosives, or other items designed to cause serious harm.</li>
+    <li><strong>Child sexual abuse material</strong> — any sexual content involving minors, in any form. This is reported to the authorities without exception.</li>
+    <li><strong>Harassment or hate</strong> — content attacking people over race, ethnicity, religion, disability, gender, gender identity, sexual orientation, age, or nationality; bullying, stalking, or doxxing.</li>
+    <li><strong>Self-harm content</strong> — material encouraging suicide, self-injury, or disordered eating.</li>
+    <li><strong>Illegal activity</strong> — trafficking, fraud, malware, unauthorised access to systems, or evading the law.</li>
+    <li><strong>Non-consensual intimate imagery</strong> — sexual content shared without the consent of everyone shown.</li>
+  </ul>
+  <p>You also agree not to attempt to break, overload, scrape, or automate {{ site }}, not to bypass rate limits or security measures, and not to use it in a way that breaks the terms of the search providers or websites it reaches.</p>
+
+  <h2>4. Enforcement</h2>
+  <p>We may suspend or delete any account, block access, or remove content at our discretion, with or without notice, if we believe these terms have been broken. Serious matters — particularly anything involving harm to children or credible threats of violence — will be referred to law enforcement.</p>
+
+  <h2>5. Accounts</h2>
+  <p>You can sign in with a third-party provider or with a one-time code sent to your email. Keep your email account secure: anyone with access to it can sign in as you. Tell us promptly if you think your account has been misused.</p>
+
+  <h2>6. Third-party content and links</h2>
+  <p>Search results and pages shown in the reader view belong to their owners and are governed by their own terms and privacy policies. {{ site }} is not responsible for them. If you believe content shown through {{ site }} infringes your copyright, contact us and we'll remove the reference.</p>
+
+  <h2>7. No warranty</h2>
+  <p>{{ site }} is provided as-is. We don't promise it will be available, accurate, complete, or free of errors. Search results may be wrong, outdated, or incomplete. Don't rely on them for medical, legal, financial, or safety decisions.</p>
+
+  <h2>8. Limitation of liability</h2>
+  <p>To the fullest extent the law allows, {{ site }} and anyone running it are not liable for any indirect, incidental, or consequential loss arising from your use of the service, including loss of data, profit, or reputation.</p>
+
+  <h2>9. Changes</h2>
+  <p>We may update these terms. The date at the top shows when they last changed. Continuing to use {{ site }} after a change means you accept the new version.</p>
+
+  <h2>10. Contact</h2>
+  <p>{% if contact %}Questions or reports: <a href="mailto:{{ contact }}">{{ contact }}</a>{% else %}Contact details are available on request through the site.{% endif %}</p>
+
+{% else %}
+
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated {{ updated }}</p>
+
+  <p>This explains what {{ site }} collects, why, and what we don't do with it.</p>
+
+  <h2>1. What we collect</h2>
+  <p><strong>If you create an account:</strong> your email address, and the display name and profile picture your sign-in provider shares. Nothing else.</p>
+  <p><strong>Sign-in codes:</strong> when you sign in by email, we store a hashed version of the one-time code and its expiry. It is deleted the moment it's used or expires.</p>
+  <p><strong>Server logs:</strong> our hosting provider keeps standard technical logs, which may include IP addresses and error details. These are used to keep the service running and diagnose faults.</p>
+
+  <h2>2. What we don't do</h2>
+  <ul>
+    <li>We don't build advertising profiles.</li>
+    <li>We don't sell or rent your data.</li>
+    <li>We don't store a permanent history of your searches linked to your account.</li>
+    <li>We don't ask for passwords — sign-in happens through your provider or a one-time code.</li>
+  </ul>
+
+  <h2>3. Searches</h2>
+  <p>Your query is sent to a third-party search provider so results can be returned. That provider handles the query under its own privacy policy. When you open a page in the reader view, our server fetches it on your behalf, which means the destination site sees our server rather than your browser.</p>
+
+  <h2>4. Cookies</h2>
+  <p>{{ site }} uses a single cookie to keep you signed in. It contains a signed session identifier, not personal data. There are no advertising or tracking cookies. Signing out clears it.</p>
+
+  <h2>5. Third parties we rely on</h2>
+  <ul>
+    <li><strong>Sign-in providers</strong> (Google, GitHub, GitLab, Microsoft, Discord) — they tell us your email, name, and picture when you choose to sign in. They don't receive your searches.</li>
+    <li><strong>Email delivery</strong> — used only to send sign-in codes.</li>
+    <li><strong>Search providers</strong> — receive your query.</li>
+    <li><strong>Hosting</strong> — runs the service and keeps technical logs.</li>
+  </ul>
+
+  <h2>6. How long we keep things</h2>
+  <p>Account records are kept until you ask us to delete them. Sign-in codes last no more than 10 minutes. Server logs follow our host's retention schedule.</p>
+
+  <h2>7. Your choices</h2>
+  <p>You can sign out at any time, and you can ask us to delete your account and its email address. Depending on where you live, you may also have rights to access, correct, or export your data, or to object to processing.</p>
+
+  <h2>8. Children</h2>
+  <p>{{ site }} isn't intended for children under 13. If we learn we've collected an account from a child under 13, we delete it.</p>
+
+  <h2>9. Security</h2>
+  <p>Sign-in codes are hashed, sessions are signed, and traffic is encrypted in transit. No system is perfectly secure, so we can't guarantee absolute protection.</p>
+
+  <h2>10. Changes and contact</h2>
+  <p>We'll update the date above whenever this policy changes. {% if contact %}Questions or deletion requests: <a href="mailto:{{ contact }}">{{ contact }}</a>{% else %}Contact details are available on request through the site.{% endif %}</p>
+
+{% endif %}
+
+  <p class="disclaimer">These documents are a plain-language starting point, not legal advice. Have them reviewed by a qualified lawyer before relying on them.</p>
+
+</main>
+</body>
+</html>

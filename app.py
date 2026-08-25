@@ -36,6 +36,12 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
 try:
+    from legal import legal as legal_blueprint
+    app_has_legal = True
+except Exception as _lexc:
+    app_has_legal = False
+
+try:
     from viewer import viewer as viewer_blueprint, proxy_link
     app.register_blueprint(viewer_blueprint)
     VIEWER_ENABLED = True
@@ -50,6 +56,9 @@ def via_lspso(url):
     """Route a result link through the in-site viewer."""
     return proxy_link(url) if VIEWER_ENABLED else url
 
+
+if app_has_legal:
+    app.register_blueprint(legal_blueprint)
 
 if AUTH_ENABLED:
     app.register_blueprint(auth_blueprint)
@@ -592,6 +601,8 @@ def status():
         "github_ready": bool(os.environ.get("GITHUB_CLIENT_ID") and os.environ.get("GITHUB_CLIENT_SECRET")),
         "gitlab_ready": bool(os.environ.get("GITLAB_CLIENT_ID") and os.environ.get("GITLAB_CLIENT_SECRET")),
         "microsoft_ready": bool(os.environ.get("MICROSOFT_CLIENT_ID") and os.environ.get("MICROSOFT_CLIENT_SECRET")),
+        "discord_ready": bool(os.environ.get("DISCORD_CLIENT_ID") and os.environ.get("DISCORD_CLIENT_SECRET")),
+        "chatgpt_ready": bool(os.environ.get("CHATGPT_CLIENT_ID") and os.environ.get("CHATGPT_CLIENT_SECRET")),
         "resend_ready": bool(os.environ.get("RESEND_API_KEY")),
         "database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite (wiped on redeploy)",
     }

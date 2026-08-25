@@ -884,3 +884,68 @@ button.ghost:hover { border-color: #cfcdc5; color: var(--ink); }
 }
 
 .result .ext:hover { color: var(--forest); }
+
+/* ---------- legal pages ---------- */
+
+.legal {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 6rem;
+}
+
+.legal h1 {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "SOFT" 0, "WONK" 0, "opsz" 60;
+  font-weight: 500;
+  font-size: 2.1rem;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0 0 0.5rem;
+}
+
+.legal .updated {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mist);
+  margin: 0 0 2.5rem;
+}
+
+.legal h2 {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "SOFT" 0, "WONK" 0, "opsz" 28;
+  font-weight: 500;
+  font-size: 1.22rem;
+  letter-spacing: -0.015em;
+  margin: 2.6rem 0 0.75rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--hair);
+}
+
+.legal p { margin: 0 0 1.05rem; line-height: 1.72; }
+.legal ul { padding-left: 1.3rem; margin: 0 0 1.05rem; }
+.legal li { margin-bottom: 0.6rem; line-height: 1.65; }
+.legal strong { font-weight: 600; }
+.legal a { color: var(--forest); text-underline-offset: 2px; }
+
+.legal .disclaimer {
+  margin-top: 3rem;
+  padding: 1.1rem 1.35rem;
+  background: var(--white);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius);
+  font-size: 0.86rem;
+  color: var(--graphite);
+}
+
+.sitefoot {
+  display: flex;
+  gap: 1.25rem;
+  justify-content: center;
+  padding: 2.5rem 1.5rem 3rem;
+  font-size: 0.8rem;
+}
+
+.sitefoot a { color: var(--mist); text-decoration: none; }
+.sitefoot a:hover { color: var(--forest); }

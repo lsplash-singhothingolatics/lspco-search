@@ -1,7 +1,4 @@
-"""Terms of Service and Privacy Policy pages.
-
-These are plain-language starting documents, not legal advice. Have a lawyer
-review them before relying on them for anything that matters.
+"""Terms of Service and Privacy Policy pages
 """
 
 import os

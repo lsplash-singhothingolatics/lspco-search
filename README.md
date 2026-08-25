@@ -57,6 +57,16 @@ Add **one** of these in Render: your service -> **Environment** -> **Add Environ
 4. **Credentials** -> **Create credentials** -> **API key** -> copy it -> that is your `GOOGLE_API_KEY`.
 5. Add both variables in Render and save.
 
+## In-site viewer
+
+Clicking a result opens the page **inside LSPSO** at `/open?url=...` rather than sending the visitor to another site. The page is fetched server-side, scripts and tracking are stripped, and the content is restyled to match LSPSO. Links inside the page keep flowing through the viewer.
+
+A bar across the top shows which site is being read, with **Back** and **Original** buttons. Anything that isn't HTML — PDFs, images, downloads — redirects to the source instead.
+
+Limits worth knowing: sites built entirely with JavaScript (single-page apps, most social networks) render bare, and some sites block server-side readers. The **Original** button always works, so nothing becomes a dead end.
+
+Internal and private addresses are refused, so the viewer can't be used to reach anything on the host network.
+
 ## Filters
 
 The results page has a filter bar that works on every provider:
@@ -81,6 +91,8 @@ Sign in with Google, GitHub, or a 6-digit code emailed by Resend. Add these in R
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | github.com/settings/developers -> New OAuth App |
 | `GITLAB_CLIENT_ID` / `GITLAB_CLIENT_SECRET` | gitlab.com -> Preferences -> Applications |
 | `GITLAB_HOST` | Optional. Only for self-hosted GitLab. Defaults to `https://gitlab.com`. |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | portal.azure.com -> App registrations -> New registration |
+| `MICROSOFT_TENANT` | Optional. Defaults to `common` (any Microsoft account). Use your tenant ID to restrict to one organisation. |
 | `RESEND_API_KEY` | resend.com -> API Keys |
 | `MAIL_FROM` | Optional. Defaults to `LSPSO <onboarding@resend.dev>`. |
 
@@ -91,6 +103,7 @@ Whichever keys you add, those buttons appear on the sign-in page. The others sta
 - Google -> Authorised redirect URI: `https://YOUR-APP.onrender.com/auth/google/callback`
 - GitHub -> Authorization callback URL: `https://YOUR-APP.onrender.com/auth/github/callback`
 - GitLab -> Redirect URI: `https://YOUR-APP.onrender.com/auth/gitlab/callback` (scope: `read_user`)
+- Microsoft -> Redirect URI (platform: Web): `https://YOUR-APP.onrender.com/auth/microsoft/callback`
 
 ### Where accounts are stored
 

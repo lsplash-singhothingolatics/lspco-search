@@ -35,6 +35,22 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
+try:
+    from viewer import viewer as viewer_blueprint, proxy_link
+    app.register_blueprint(viewer_blueprint)
+    VIEWER_ENABLED = True
+except Exception as _vexc:
+    VIEWER_ENABLED = False
+    proxy_link = lambda u: u
+    app.logger.error("In-site viewer unavailable: %s", _vexc)
+
+
+@app.template_filter("via_lspso")
+def via_lspso(url):
+    """Route a result link through the in-site viewer."""
+    return proxy_link(url) if VIEWER_ENABLED else url
+
+
 if AUTH_ENABLED:
     app.register_blueprint(auth_blueprint)
     try:
@@ -569,6 +585,7 @@ def status():
         "static_found": os.path.isfile(os.path.join(app.root_path, "static", "style.css")),
         "search_engine": engine_name(),
         "accounts_enabled": AUTH_ENABLED,
+        "in_site_viewer": VIEWER_ENABLED,
         "accounts_problem": AUTH_ERROR,
         "secret_key_set": os.environ.get("SECRET_KEY") is not None,
         "google_ready": bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")),

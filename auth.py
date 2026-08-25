@@ -20,6 +20,16 @@ GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "").strip()
 GITLAB_CLIENT_ID = os.environ.get("GITLAB_CLIENT_ID", "").strip()
 GITLAB_CLIENT_SECRET = os.environ.get("GITLAB_CLIENT_SECRET", "").strip()
 GITLAB_HOST = os.environ.get("GITLAB_HOST", "https://gitlab.com").rstrip("/")
+MS_CLIENT_ID = os.environ.get("MICROSOFT_CLIENT_ID", "").strip()
+MS_CLIENT_SECRET = os.environ.get("MICROSOFT_CLIENT_SECRET", "").strip()
+MS_TENANT = os.environ.get("MICROSOFT_TENANT", "common").strip()
+DISCORD_CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID", "").strip()
+DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "").strip()
+# Sign in with ChatGPT is partner-gated: these stay empty until OpenAI issues
+# credentials, and the button stays hidden until then.
+CHATGPT_CLIENT_ID = os.environ.get("CHATGPT_CLIENT_ID", "").strip()
+CHATGPT_CLIENT_SECRET = os.environ.get("CHATGPT_CLIENT_SECRET", "").strip()
+CHATGPT_ISSUER = os.environ.get("CHATGPT_ISSUER", "https://auth.openai.com").rstrip("/")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 MAIL_FROM = os.environ.get("MAIL_FROM", "LSPSO <onboarding@resend.dev>").strip()
 
@@ -31,6 +41,9 @@ def providers():
         "google": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
         "github": bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET),
         "gitlab": bool(GITLAB_CLIENT_ID and GITLAB_CLIENT_SECRET),
+        "microsoft": bool(MS_CLIENT_ID and MS_CLIENT_SECRET),
+        "discord": bool(DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET),
+        "chatgpt": bool(CHATGPT_CLIENT_ID and CHATGPT_CLIENT_SECRET),
         "email": bool(RESEND_API_KEY),
     }
 
@@ -263,6 +276,228 @@ def gitlab_callback():
         profile.get("name") or profile.get("username"),
         profile.get("avatar_url"),
         "gitlab",
+    ))
+    return redirect(safe_next())
+
+
+# ------------------------------------------------------------------ microsoft
+
+MS_BASE = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0"
+
+
+@auth.route("/auth/microsoft")
+def microsoft_start():
+    if not providers()["microsoft"]:
+        flash("Microsoft sign-in is not configured yet.")
+        return redirect(url_for("auth.login"))
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
+    params = {
+        "client_id": MS_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": url_for("auth.microsoft_callback", _external=True, _scheme="https"),
+        "response_mode": "query",
+        "scope": "openid email profile User.Read",
+        "state": state,
+        "prompt": "select_account",
+    }
+    return redirect(MS_BASE.format(tenant=MS_TENANT) + "/authorize?" + urlencode(params))
+
+
+@auth.route("/auth/microsoft/callback")
+def microsoft_callback():
+    if request.args.get("state") != session.pop("oauth_state", None):
+        flash("Sign-in expired. Please try again.")
+        return redirect(url_for("auth.login"))
+    code = request.args.get("code")
+    if not code:
+        flash("Microsoft sign-in was cancelled.")
+        return redirect(url_for("auth.login"))
+
+    try:
+        token = requests.post(
+            MS_BASE.format(tenant=MS_TENANT) + "/token",
+            data={
+                "client_id": MS_CLIENT_ID,
+                "client_secret": MS_CLIENT_SECRET,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": url_for("auth.microsoft_callback", _external=True, _scheme="https"),
+                "scope": "openid email profile User.Read",
+            },
+            timeout=TIMEOUT,
+        ).json()
+        profile = requests.get(
+            "https://graph.microsoft.com/v1.0/me",
+            headers={"Authorization": "Bearer " + token["access_token"]},
+            timeout=TIMEOUT,
+        ).json()
+    except Exception:
+        flash("Could not reach Microsoft. Please try again.")
+        return redirect(url_for("auth.login"))
+
+    # work accounts use mail, personal accounts use userPrincipalName
+    email = profile.get("mail") or profile.get("userPrincipalName")
+    if not email or "@" not in email:
+        flash("Microsoft did not share an email address.")
+        return redirect(url_for("auth.login"))
+
+    sign_in(db.upsert_user(
+        email, profile.get("displayName"), None, "microsoft"
+    ))
+    return redirect(safe_next())
+
+
+# ------------------------------------------------------------------ discord
+
+@auth.route("/auth/discord")
+def discord_start():
+    if not providers()["discord"]:
+        flash("Discord sign-in is not configured yet.")
+        return redirect(url_for("auth.login"))
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
+    params = {
+        "client_id": DISCORD_CLIENT_ID,
+        "redirect_uri": url_for("auth.discord_callback", _external=True, _scheme="https"),
+        "response_type": "code",
+        "scope": "identify email",
+        "state": state,
+        "prompt": "consent",
+    }
+    return redirect("https://discord.com/oauth2/authorize?" + urlencode(params))
+
+
+@auth.route("/auth/discord/callback")
+def discord_callback():
+    if request.args.get("state") != session.pop("oauth_state", None):
+        flash("Sign-in expired. Please try again.")
+        return redirect(url_for("auth.login"))
+    code = request.args.get("code")
+    if not code:
+        flash("Discord sign-in was cancelled.")
+        return redirect(url_for("auth.login"))
+
+    try:
+        token = requests.post(
+            "https://discord.com/api/oauth2/token",
+            data={
+                "client_id": DISCORD_CLIENT_ID,
+                "client_secret": DISCORD_CLIENT_SECRET,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": url_for("auth.discord_callback", _external=True, _scheme="https"),
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=TIMEOUT,
+        ).json()
+        profile = requests.get(
+            "https://discord.com/api/users/@me",
+            headers={"Authorization": "Bearer " + token["access_token"]},
+            timeout=TIMEOUT,
+        ).json()
+    except Exception:
+        flash("Could not reach Discord. Please try again.")
+        return redirect(url_for("auth.login"))
+
+    if not profile.get("email"):
+        flash("Discord did not share a verified email address.")
+        return redirect(url_for("auth.login"))
+
+    avatar = None
+    if profile.get("avatar"):
+        avatar = (
+            f"https://cdn.discordapp.com/avatars/{profile['id']}/{profile['avatar']}.png"
+        )
+
+    sign_in(db.upsert_user(
+        profile["email"],
+        profile.get("global_name") or profile.get("username"),
+        avatar,
+        "discord",
+    ))
+    return redirect(safe_next())
+
+
+# ------------------------------------------------------------------ chatgpt
+#
+# "Sign in with ChatGPT" is an OpenID Connect provider, but OpenAI grants
+# credentials to approved partners rather than through a public console.
+# Endpoints are read from the issuer's discovery document so this keeps
+# working if OpenAI changes them.
+
+_oidc_cache = {}
+
+
+def oidc_config(issuer):
+    if issuer not in _oidc_cache:
+        r = requests.get(issuer + "/.well-known/openid-configuration", timeout=TIMEOUT)
+        r.raise_for_status()
+        _oidc_cache[issuer] = r.json()
+    return _oidc_cache[issuer]
+
+
+@auth.route("/auth/chatgpt")
+def chatgpt_start():
+    if not providers()["chatgpt"]:
+        flash("Sign in with ChatGPT is not enabled for this site yet.")
+        return redirect(url_for("auth.login"))
+    try:
+        conf = oidc_config(CHATGPT_ISSUER)
+    except Exception:
+        flash("Could not reach OpenAI. Please try again.")
+        return redirect(url_for("auth.login"))
+
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
+    params = {
+        "client_id": CHATGPT_CLIENT_ID,
+        "redirect_uri": url_for("auth.chatgpt_callback", _external=True, _scheme="https"),
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+    }
+    return redirect(conf["authorization_endpoint"] + "?" + urlencode(params))
+
+
+@auth.route("/auth/chatgpt/callback")
+def chatgpt_callback():
+    if request.args.get("state") != session.pop("oauth_state", None):
+        flash("Sign-in expired. Please try again.")
+        return redirect(url_for("auth.login"))
+    code = request.args.get("code")
+    if not code:
+        flash("ChatGPT sign-in was cancelled.")
+        return redirect(url_for("auth.login"))
+
+    try:
+        conf = oidc_config(CHATGPT_ISSUER)
+        token = requests.post(
+            conf["token_endpoint"],
+            data={
+                "client_id": CHATGPT_CLIENT_ID,
+                "client_secret": CHATGPT_CLIENT_SECRET,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": url_for("auth.chatgpt_callback", _external=True, _scheme="https"),
+            },
+            timeout=TIMEOUT,
+        ).json()
+        profile = requests.get(
+            conf["userinfo_endpoint"],
+            headers={"Authorization": "Bearer " + token["access_token"]},
+            timeout=TIMEOUT,
+        ).json()
+    except Exception:
+        flash("Could not complete ChatGPT sign-in. Please try again.")
+        return redirect(url_for("auth.login"))
+
+    if not profile.get("email"):
+        flash("ChatGPT did not share an email address.")
+        return redirect(url_for("auth.login"))
+
+    sign_in(db.upsert_user(
+        profile["email"], profile.get("name"), profile.get("picture"), "chatgpt"
     ))
     return redirect(safe_next())
 

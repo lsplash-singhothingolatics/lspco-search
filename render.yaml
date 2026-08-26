@@ -39,6 +39,18 @@ services:
         sync: false
       - key: YAHOO_CLIENT_SECRET
         sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: MSG91_AUTH_KEY
+        sync: false
+      - key: MSG91_TEMPLATE_ID
+        sync: false
+      - key: DEFAULT_COUNTRY_CODE
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: SERPER_API_KEY

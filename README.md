@@ -96,7 +96,11 @@ Sign in with Google, GitHub, or a 6-digit code emailed by Resend. Add these in R
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | discord.com/developers/applications -> New Application -> OAuth2 |
 | `CHATGPT_CLIENT_ID` / `CHATGPT_CLIENT_SECRET` | Partner-only. OpenAI issues these on request; there is no public console. Button stays hidden until both are set. |
 | `YAHOO_CLIENT_ID` / `YAHOO_CLIENT_SECRET` | developer.yahoo.com/apps/create -> Web Application, OpenID Connect Permissions: Profiles + Email |
-| `RESEND_API_KEY` | resend.com -> API Keys |
+| `RESEND_API_KEY` | resend.com -> API Keys (email codes) |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER` | twilio.com console (SMS codes, works worldwide) |
+| `MSG91_AUTH_KEY` / `MSG91_TEMPLATE_ID` | msg91.com (SMS codes, cheaper for India). Used in preference to Twilio when set. |
+| `MSG91_SENDER_ID` | Optional, defaults to `LSPSO`. |
+| `DEFAULT_COUNTRY_CODE` | Optional, e.g. `91`. Lets people type a local number without the country code. |
 | `MAIL_FROM` | Optional. Defaults to `LSPSO <onboarding@resend.dev>`. |
 
 Whichever keys you add, those buttons appear on the sign-in page. The others stay hidden.

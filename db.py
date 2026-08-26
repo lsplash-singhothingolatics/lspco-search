@@ -34,7 +34,8 @@ metadata = MetaData()
 users = Table(
     "users", metadata,
     Column("id", Integer, primary_key=True),
-    Column("email", String(320), unique=True, nullable=False),
+    Column("email", String(320), unique=True, nullable=True),
+    Column("phone", String(32), unique=True, nullable=True),
     Column("name", String(200)),
     Column("avatar", String(500)),
     Column("provider", String(20)),            # google | github | email
@@ -54,6 +55,19 @@ codes = Table(
 
 def init_db():
     metadata.create_all(engine)
+    # add the phone column to databases created before phone sign-in existed
+    try:
+        with engine.begin() as c:
+            cols = [r[1] for r in c.exec_driver_sql("PRAGMA table_info(users)")] \
+                if engine.dialect.name == "sqlite" else []
+            if engine.dialect.name == "sqlite" and cols and "phone" not in cols:
+                c.exec_driver_sql("ALTER TABLE users ADD COLUMN phone VARCHAR(32)")
+            elif engine.dialect.name == "postgresql":
+                c.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(32)"
+                )
+    except Exception:
+        pass
 
 
 def now():
@@ -92,11 +106,56 @@ def upsert_user(email, name=None, avatar=None, provider="email"):
         }
 
 
+def upsert_phone_user(phone, name=None):
+    """Phone accounts have no email address."""
+    phone = normalise_phone(phone)
+    with engine.begin() as c:
+        row = c.execute(select(users).where(users.c.phone == phone)).mappings().first()
+        if row:
+            return dict(row)
+        result = c.execute(
+            insert(users).values(
+                phone=phone, name=name, provider="phone", created_at=now(),
+            )
+        )
+        return {
+            "id": result.inserted_primary_key[0],
+            "email": None, "phone": phone, "name": name,
+            "avatar": None, "provider": "phone",
+        }
+
+
+DEFAULT_COUNTRY_CODE = os.environ.get("DEFAULT_COUNTRY_CODE", "").strip().lstrip("+")
+
+
+def normalise_phone(phone):
+    """Returns the number in E.164 form (+countrycode + number), or "" if it
+    can't be worked out. SMS providers reject anything else."""
+    raw = (phone or "").strip()
+    has_plus = raw.startswith("+") or raw.startswith("00")
+    digits = "".join(ch for ch in raw if ch.isdigit())
+
+    if raw.startswith("00"):
+        digits = digits[2:]
+
+    if not digits:
+        return ""
+
+    if has_plus:
+        return "+" + digits.lstrip("0") if raw.startswith("00") else "+" + digits
+
+    # a local number: prepend the configured country code, dropping any trunk 0
+    if DEFAULT_COUNTRY_CODE:
+        return "+" + DEFAULT_COUNTRY_CODE + digits.lstrip("0")
+
+    return ""          # no country code and none configured -> reject
+
+
 # ---------------------------------------------------------------- otp codes
 
-def hash_code(email, code):
+def hash_code(identifier, code):
     salt = os.environ.get("SECRET_KEY", "lspso-dev")
-    return hashlib.sha256(f"{salt}:{email.lower()}:{code}".encode()).hexdigest()
+    return hashlib.sha256(f"{salt}:{identifier.lower()}:{code}".encode()).hexdigest()
 
 
 def create_code(email, ttl_minutes=10):

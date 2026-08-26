@@ -34,6 +34,14 @@ YAHOO_CLIENT_ID = os.environ.get("YAHOO_CLIENT_ID", "").strip()
 YAHOO_CLIENT_SECRET = os.environ.get("YAHOO_CLIENT_SECRET", "").strip()
 YAHOO_ISSUER = "https://api.login.yahoo.com"
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+
+# SMS: whichever of these is configured gets used
+TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID", "").strip()
+TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "").strip()
+TWILIO_FROM = os.environ.get("TWILIO_FROM_NUMBER", "").strip()
+MSG91_KEY = os.environ.get("MSG91_AUTH_KEY", "").strip()
+MSG91_TEMPLATE = os.environ.get("MSG91_TEMPLATE_ID", "").strip()
+MSG91_SENDER = os.environ.get("MSG91_SENDER_ID", "LSPSO").strip()
 MAIL_FROM = os.environ.get("MAIL_FROM", "LSPSO <onboarding@resend.dev>").strip()
 
 TIMEOUT = 12
@@ -49,6 +57,8 @@ def providers():
         "chatgpt": bool(CHATGPT_CLIENT_ID and CHATGPT_CLIENT_SECRET),
         "yahoo": bool(YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET),
         "email": bool(RESEND_API_KEY),
+        "phone": bool((TWILIO_SID and TWILIO_TOKEN and TWILIO_FROM)
+                      or (MSG91_KEY and MSG91_TEMPLATE)),
     }
 
 
@@ -621,6 +631,70 @@ def send_code_email(email, code):
     r.raise_for_status()
 
 
+# ------------------------------------------------------------------ sms otp
+
+def send_code_sms(phone, code):
+    """Sends via MSG91 if configured (cheaper in India), otherwise Twilio."""
+    text = f"{code} is your LSPSO sign-in code. It expires in 10 minutes."
+
+    if MSG91_KEY and MSG91_TEMPLATE:
+        r = requests.post(
+            "https://control.msg91.com/api/v5/flow/",
+            headers={"authkey": MSG91_KEY, "Content-Type": "application/json"},
+            json={
+                "template_id": MSG91_TEMPLATE,
+                "sender": MSG91_SENDER,
+                "short_url": "0",
+                "recipients": [{"mobiles": phone.lstrip("+"), "otp": code}],
+            },
+            timeout=TIMEOUT,
+        )
+        r.raise_for_status()
+        if str(r.json().get("type", "")).lower() == "error":
+            raise RuntimeError(r.json().get("message", "MSG91 rejected the request"))
+        return
+
+    if TWILIO_SID and TWILIO_TOKEN and TWILIO_FROM:
+        r = requests.post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json",
+            auth=(TWILIO_SID, TWILIO_TOKEN),
+            data={"To": phone, "From": TWILIO_FROM, "Body": text},
+            timeout=TIMEOUT,
+        )
+        r.raise_for_status()
+        return
+
+    raise RuntimeError("No SMS provider configured")
+
+
+@auth.route("/auth/phone", methods=["POST"])
+def phone_start():
+    if not providers()["phone"]:
+        flash("Phone sign-in is not configured yet.")
+        return redirect(url_for("auth.login"))
+
+    phone = db.normalise_phone(request.form.get("phone"))
+    if not phone or len(phone) < 8:
+        flash("Enter your number with the country code, for example +91 98765 43210.")
+        return redirect(url_for("auth.login"))
+
+    code, error = db.create_code(phone)
+    if error:
+        flash(error)
+        return redirect(url_for("auth.verify"))
+
+    try:
+        send_code_sms(phone, code)
+    except Exception:
+        flash("The text message could not be sent. Check the number and try again.")
+        return redirect(url_for("auth.login"))
+
+    session["pending_id"] = phone
+    session["pending_channel"] = "phone"
+    session.pop("pending_email", None)
+    return redirect(url_for("auth.verify"))
+
+
 @auth.route("/auth/email", methods=["POST"])
 def email_start():
     email = (request.form.get("email") or "").strip().lower()
@@ -642,39 +716,49 @@ def email_start():
         flash("The code could not be sent. Check the address and try again.")
         return redirect(url_for("auth.login"))
 
-    session["pending_email"] = email
+    session["pending_id"] = email
+    session["pending_channel"] = "email"
     return redirect(url_for("auth.verify"))
 
 
 @auth.route("/auth/verify", methods=["GET", "POST"])
 def verify():
-    email = session.get("pending_email") or request.args.get("email", "")
-    if not email:
+    identifier = session.get("pending_id") or request.args.get("email", "")
+    channel = session.get("pending_channel", "email")
+    if not identifier:
         return redirect(url_for("auth.login"))
 
     if request.method == "POST":
-        ok, error = db.verify_code(email, request.form.get("code"))
+        ok, error = db.verify_code(identifier, request.form.get("code"))
         if not ok:
             flash(error)
             return redirect(url_for("auth.verify"))
-        session.pop("pending_email", None)
-        sign_in(db.upsert_user(email, provider="email"))
+        session.pop("pending_id", None)
+        session.pop("pending_channel", None)
+        if channel == "phone":
+            sign_in(db.upsert_phone_user(identifier))
+        else:
+            sign_in(db.upsert_user(identifier, provider="email"))
         return redirect(safe_next())
 
-    return render_template("verify.html", email=email)
+    return render_template("verify.html", email=identifier, channel=channel)
 
 
 @auth.route("/auth/resend", methods=["POST"])
 def resend():
-    email = session.get("pending_email")
-    if not email:
+    identifier = session.get("pending_id")
+    channel = session.get("pending_channel", "email")
+    if not identifier:
         return redirect(url_for("auth.login"))
-    code, error = db.create_code(email)
+    code, error = db.create_code(identifier)
     if error:
         flash(error)
     else:
         try:
-            send_code_email(email, code)
+            if channel == "phone":
+                send_code_sms(identifier, code)
+            else:
+                send_code_email(identifier, code)
             flash("A new code is on its way.")
         except Exception:
             flash("The code could not be sent. Try again shortly.")

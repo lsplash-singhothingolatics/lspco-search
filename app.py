@@ -605,6 +605,11 @@ def status():
         "chatgpt_ready": bool(os.environ.get("CHATGPT_CLIENT_ID") and os.environ.get("CHATGPT_CLIENT_SECRET")),
         "yahoo_ready": bool(os.environ.get("YAHOO_CLIENT_ID") and os.environ.get("YAHOO_CLIENT_SECRET")),
         "resend_ready": bool(os.environ.get("RESEND_API_KEY")),
+        "sms_ready": bool(
+            (os.environ.get("TWILIO_ACCOUNT_SID") and os.environ.get("TWILIO_AUTH_TOKEN")
+             and os.environ.get("TWILIO_FROM_NUMBER"))
+            or (os.environ.get("MSG91_AUTH_KEY") and os.environ.get("MSG91_TEMPLATE_ID"))
+        ),
         "database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite (wiped on redeploy)",
     }
 

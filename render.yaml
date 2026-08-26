@@ -23,6 +23,22 @@ services:
         sync: false
       - key: GITLAB_CLIENT_SECRET
         sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: CHATGPT_CLIENT_ID
+        sync: false
+      - key: CHATGPT_CLIENT_SECRET
+        sync: false
+      - key: YAHOO_CLIENT_ID
+        sync: false
+      - key: YAHOO_CLIENT_SECRET
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: SERPER_API_KEY

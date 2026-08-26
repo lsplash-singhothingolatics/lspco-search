@@ -30,6 +30,9 @@ DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "").strip()
 CHATGPT_CLIENT_ID = os.environ.get("CHATGPT_CLIENT_ID", "").strip()
 CHATGPT_CLIENT_SECRET = os.environ.get("CHATGPT_CLIENT_SECRET", "").strip()
 CHATGPT_ISSUER = os.environ.get("CHATGPT_ISSUER", "https://auth.openai.com").rstrip("/")
+YAHOO_CLIENT_ID = os.environ.get("YAHOO_CLIENT_ID", "").strip()
+YAHOO_CLIENT_SECRET = os.environ.get("YAHOO_CLIENT_SECRET", "").strip()
+YAHOO_ISSUER = "https://api.login.yahoo.com"
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 MAIL_FROM = os.environ.get("MAIL_FROM", "LSPSO <onboarding@resend.dev>").strip()
 
@@ -44,6 +47,7 @@ def providers():
         "microsoft": bool(MS_CLIENT_ID and MS_CLIENT_SECRET),
         "discord": bool(DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET),
         "chatgpt": bool(CHATGPT_CLIENT_ID and CHATGPT_CLIENT_SECRET),
+        "yahoo": bool(YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET),
         "email": bool(RESEND_API_KEY),
     }
 
@@ -498,6 +502,92 @@ def chatgpt_callback():
 
     sign_in(db.upsert_user(
         profile["email"], profile.get("name"), profile.get("picture"), "chatgpt"
+    ))
+    return redirect(safe_next())
+
+
+# ------------------------------------------------------------------ yahoo
+#
+# Yahoo is an OpenID Connect provider. Its token endpoint expects the client
+# credentials as HTTP Basic auth rather than form fields.
+
+@auth.route("/auth/yahoo")
+def yahoo_start():
+    if not providers()["yahoo"]:
+        flash("Yahoo sign-in is not configured yet.")
+        return redirect(url_for("auth.login"))
+    try:
+        conf = oidc_config(YAHOO_ISSUER)
+        authorize = conf["authorization_endpoint"]
+    except Exception:
+        authorize = "https://api.login.yahoo.com/oauth2/request_auth"
+
+    state = secrets.token_urlsafe(24)
+    session["oauth_state"] = state
+    params = {
+        "client_id": YAHOO_CLIENT_ID,
+        "redirect_uri": url_for("auth.yahoo_callback", _external=True, _scheme="https"),
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+    }
+    return redirect(authorize + "?" + urlencode(params))
+
+
+@auth.route("/auth/yahoo/callback")
+def yahoo_callback():
+    if request.args.get("state") != session.pop("oauth_state", None):
+        flash("Sign-in expired. Please try again.")
+        return redirect(url_for("auth.login"))
+    code = request.args.get("code")
+    if not code:
+        flash("Yahoo sign-in was cancelled.")
+        return redirect(url_for("auth.login"))
+
+    try:
+        try:
+            conf = oidc_config(YAHOO_ISSUER)
+            token_url = conf["token_endpoint"]
+            userinfo_url = conf["userinfo_endpoint"]
+        except Exception:
+            token_url = "https://api.login.yahoo.com/oauth2/get_token"
+            userinfo_url = "https://api.login.yahoo.com/openid/v1/userinfo"
+
+        token = requests.post(
+            token_url,
+            auth=(YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET),   # Yahoo wants Basic auth
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": url_for("auth.yahoo_callback", _external=True, _scheme="https"),
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=TIMEOUT,
+        ).json()
+
+        profile = requests.get(
+            userinfo_url,
+            headers={"Authorization": "Bearer " + token["access_token"]},
+            timeout=TIMEOUT,
+        ).json()
+    except Exception:
+        flash("Could not complete Yahoo sign-in. Please try again.")
+        return redirect(url_for("auth.login"))
+
+    email = profile.get("email")
+    if not email:
+        flash("Yahoo did not share an email address.")
+        return redirect(url_for("auth.login"))
+
+    picture = profile.get("picture")
+    if isinstance(picture, dict):
+        picture = picture.get("data", [{}])[0].get("image_url")
+
+    sign_in(db.upsert_user(
+        email,
+        profile.get("name") or profile.get("given_name"),
+        picture if isinstance(picture, str) else None,
+        "yahoo",
     ))
     return redirect(safe_next())
 

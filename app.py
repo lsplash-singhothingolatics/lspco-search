@@ -603,6 +603,7 @@ def status():
         "microsoft_ready": bool(os.environ.get("MICROSOFT_CLIENT_ID") and os.environ.get("MICROSOFT_CLIENT_SECRET")),
         "discord_ready": bool(os.environ.get("DISCORD_CLIENT_ID") and os.environ.get("DISCORD_CLIENT_SECRET")),
         "chatgpt_ready": bool(os.environ.get("CHATGPT_CLIENT_ID") and os.environ.get("CHATGPT_CLIENT_SECRET")),
+        "yahoo_ready": bool(os.environ.get("YAHOO_CLIENT_ID") and os.environ.get("YAHOO_CLIENT_SECRET")),
         "resend_ready": bool(os.environ.get("RESEND_API_KEY")),
         "database": "postgres" if os.environ.get("DATABASE_URL") else "sqlite (wiped on redeploy)",
     }

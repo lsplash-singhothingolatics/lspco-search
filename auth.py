@@ -661,7 +661,15 @@ def send_code_sms(phone, code):
             data={"To": phone, "From": TWILIO_FROM, "Body": text},
             timeout=TIMEOUT,
         )
-        r.raise_for_status()
+        if r.status_code >= 400:
+            try:
+                info = r.json()
+                raise RuntimeError(
+                    f"Twilio {info.get('code')}: {info.get('message')} "
+                    f"({info.get('more_info', '')})"
+                )
+            except ValueError:
+                raise RuntimeError(f"Twilio HTTP {r.status_code}: {r.text[:300]}")
         return
 
     raise RuntimeError("No SMS provider configured")
@@ -685,8 +693,13 @@ def phone_start():
 
     try:
         send_code_sms(phone, code)
-    except Exception:
-        flash("The text message could not be sent. Check the number and try again.")
+    except Exception as exc:
+        from flask import current_app
+        current_app.logger.error("SMS send failed for %s -> %s", phone, exc)
+        if os.environ.get("SHOW_ERRORS") == "1":
+            flash(str(exc))
+        else:
+            flash("The text message could not be sent. Check the number and try again.")
         return redirect(url_for("auth.login"))
 
     session["pending_id"] = phone

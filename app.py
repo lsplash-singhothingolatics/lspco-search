@@ -583,6 +583,40 @@ def debug_search():
     return report
 
 
+@app.route("/debug/sms")
+def debug_sms():
+    """Reports SMS configuration and, with ?to=+91..., attempts a real send.
+    Only reveals details when SHOW_ERRORS=1 is set."""
+    if os.environ.get("SHOW_ERRORS") != "1":
+        return {"error": "Set SHOW_ERRORS=1 in Render to use this page."}, 403
+
+    sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
+    report = {
+        "twilio_sid_set": bool(sid),
+        "twilio_sid_looks_valid": sid.startswith("AC") and len(sid) == 34,
+        "twilio_token_set": bool(os.environ.get("TWILIO_AUTH_TOKEN")),
+        "twilio_from": os.environ.get("TWILIO_FROM_NUMBER", "(not set)"),
+        "twilio_from_is_e164": os.environ.get("TWILIO_FROM_NUMBER", "").startswith("+"),
+        "msg91_set": bool(os.environ.get("MSG91_AUTH_KEY")),
+        "default_country_code": os.environ.get("DEFAULT_COUNTRY_CODE", "(not set)"),
+    }
+
+    to = request.args.get("to")
+    if to:
+        try:
+            import db as _db
+            from auth import send_code_sms
+            normalised = _db.normalise_phone(to)
+            report["number_normalised_to"] = normalised or "COULD NOT PARSE"
+            if normalised:
+                send_code_sms(normalised, "123456")
+                report["send_result"] = "sent successfully"
+        except Exception as exc:
+            report["send_result"] = f"{type(exc).__name__}: {exc}"
+
+    return report
+
+
 @app.route("/status")
 def status():
     """Open /status to see what is configured. No secrets are shown."""

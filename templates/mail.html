@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if query %}{{ query }} — your mail{% else %}Your mail{% endif %} — LSPSO</title>
+<meta name="theme-color" content="#f6f5f2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Manrope:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+  .mail-wrap { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  .mail-head { display: flex; align-items: baseline; gap: .75rem; margin-bottom: 1.5rem; }
+  .mail-tabs { display: flex; gap: .25rem; margin: 1.25rem 0 1.75rem; }
+  .mail-tabs a {
+    padding: .45rem .9rem; border-radius: 999px; text-decoration: none;
+    font-size: .88rem; color: #57544c; border: 1px solid transparent;
+  }
+  .mail-tabs a.on { background: #fff; border-color: #e3e1da; color: #1b1b18; font-weight: 600; }
+  .msg {
+    display: block; text-decoration: none; color: inherit;
+    padding: .95rem 1.1rem; border: 1px solid #e7e5de; border-radius: 12px;
+    background: #fff; margin-bottom: .55rem;
+  }
+  .msg:hover { border-color: #c9c6bc; }
+  .msg-top { display: flex; align-items: baseline; gap: .6rem; }
+  .msg-from { font-weight: 600; font-size: .9rem; }
+  .msg-date { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: .72rem; color: #97948b; }
+  .msg-sub { font-size: .92rem; margin-top: .15rem; }
+  .msg-snip { font-size: .84rem; color: #86837b; margin-top: .2rem; }
+  .msg.unread .msg-from, .msg.unread .msg-sub { font-weight: 700; }
+  .pill {
+    font-family: 'IBM Plex Mono', monospace; font-size: .66rem; text-transform: uppercase;
+    letter-spacing: .08em; color: #6f6c64; border: 1px solid #e3e1da;
+    border-radius: 999px; padding: .1rem .45rem;
+  }
+  .mail-empty { text-align: center; padding: 3rem 1rem; color: #86837b; }
+  .mail-empty h2 { font-family: 'Fraunces', serif; font-weight: 400; color: #1b1b18; margin-bottom: .5rem; }
+</style>
+</head>
+<body>
+<main class="mail-wrap">
+
+  <div class="mail-head">
+    <a class="wordmark" href="/">LSPSO<span class="dot">.</span></a>
+    <span class="pill">Your mail</span>
+  </div>
+
+  <form action="{{ url_for('mail.search_mail') }}" method="get">
+    <input class="field" type="search" name="q" value="{{ query or '' }}"
+           placeholder="Search your mail" autofocus
+           style="width:100%;padding:.85rem 1rem;border:1px solid #e3e1da;border-radius:999px;font-size:.95rem">
+  </form>
+
+  <div class="mail-tabs">
+    <a href="{{ url_for('home') }}{% if query %}?q={{ query }}{% endif %}">Web</a>
+    <a class="on" href="{{ url_for('mail.search_mail') }}{% if query %}?q={{ query }}{% endif %}">
+      Mail{% if unread %} · {{ unread }}{% endif %}
+    </a>
+  </div>
+
+  {% if error %}
+    <div class="mail-empty"><h2>{{ error }}</h2></div>
+
+  {% elif not linked %}
+    <div class="mail-empty">
+      <h2>No mailbox found</h2>
+      <p>There's no LSPMail account on <strong>{{ user.email }}</strong> yet.</p>
+      {% if mail_url %}<p><a href="{{ mail_url }}" target="_blank" rel="noopener">Open LSPMail</a></p>{% endif %}
+    </div>
+
+  {% elif not query %}
+    <div class="mail-empty">
+      <h2>{% if unread %}{{ unread }} unread{% else %}You're all caught up{% endif %}</h2>
+      <p>Type above to search your mail.</p>
+    </div>
+
+  {% elif not messages %}
+    <div class="mail-empty">
+      <h2>Nothing matched</h2>
+      <p>No message mentions "{{ query }}".</p>
+    </div>
+
+  {% else %}
+    {% for m in messages %}
+      <a class="msg {% if m.unread %}unread{% endif %}" href="{{ m.url }}" target="_blank" rel="noopener">
+        <div class="msg-top">
+          <span class="msg-from">{{ m.from }}</span>
+          {% if m.folder != 'inbox' %}<span class="pill">{{ m.folder }}</span>{% endif %}
+          {% if m.hasAttachments %}<span class="pill">file</span>{% endif %}
+          <span class="msg-date">{{ m.date[:10] }}</span>
+        </div>
+        <div class="msg-sub">{{ m.subject }}</div>
+        {% if m.snippet %}<div class="msg-snip">{{ m.snippet }}</div>{% endif %}
+      </a>
+    {% endfor %}
+  {% endif %}
+
+  <p class="hint" style="margin-top:2rem"><a href="/">← Back to search</a></p>
+</main>
+</body>
+</html>

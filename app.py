@@ -652,6 +652,16 @@ def status():
 def healthz():
     return {"status": "ok"}
 
-
+# --- LSPMail link: mail search + sign in with LSPMail ----------------------
+LSPMAIL_LINK_ENABLED = False
+LSPMAIL_LINK_ERROR = None
+try:
+    from lspmail_link import mail_blueprint, lspmail_auth
+    app.register_blueprint(mail_blueprint)
+    app.register_blueprint(lspmail_auth)
+    LSPMAIL_LINK_ENABLED = True
+except Exception as _mexc:
+    LSPMAIL_LINK_ERROR = f"{type(_mexc).__name__}: {_mexc}"
+    app.logger.error("LSPMail link unavailable: %s", LSPMAIL_LINK_ERROR)
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
